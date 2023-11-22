@@ -1,196 +1,156 @@
-// use serialport;
-// use serialport::{DataBits, FlowControl, Parity, SerialPort, StopBits};
-// use std::fs::File;
-// use std::io::{Read, Write};
-// use std::time::Duration;
-//
-// // Function to list available ports
-// fn list_available_ports() {
-//     let ports = serialport::available_ports().expect("No ports found!");
-//
-//     for p in ports {
-//         println!("{}", p.port_name);
-//     }
-// }
-//
-// // Function to configure and open a serial port
-// fn configure_and_open_serial_port(port_name: &str, baud_rate: u32) -> Box<dyn SerialPort> {
-//     serialport::new(port_name, baud_rate)
-//         .data_bits(DataBits::Eight)
-//         .stop_bits(StopBits::One)
-//         .parity(Parity::None)
-//         .flow_control(FlowControl::None)
-//         .timeout(Duration::from_millis(10))
-//         .open()
-//         .expect("Failed to open port")
-// }
-//
-// // Function to receive and process data from the serial port
-// fn receive_data(port: &mut Box<dyn SerialPort>, output_file_path: &str) {
-//     let mut buffer: Vec<u8> = vec![0; 32];
-//
-//     let mut output_file =
-//         File::create(output_file_path).expect("Unable to create a file");
-//
-//     loop {
-//         match port.read(&mut buffer) {
-//             Ok(bytes_read) => {
-//                 if bytes_read > 0 {
-//                     let received_data = &buffer[..bytes_read];
-//                     if let Ok(utf_8_data) = std::str::from_utf8(received_data) {
-//                         output_file
-//                             .write_all(&received_data)
-//                             .expect("Unable to write data");
-//                         println!("Received: {:?}", utf_8_data);
-//
-//                         if utf_8_data == "\n" {
-//                             break;
-//                         }
-//
-//                         port.clear(serialport::ClearBuffer::Input)
-//                             .expect("Unable to clear buffer");
-//
-//                         std::thread::sleep(Duration::from_millis(50)); // Adjust sleep duration as needed
-//                     } else {
-//                         println!("Received non-UTF-8 data{:?}", &received_data);
-//                     }
-//                 }
-//             }
-//
-//             Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {
-//                 // eprintln!("Timeout occurred. Waiting for more data...");
-//             }
-//             Err(e) => {
-//                 eprintln!("Error reading from serial port: {}", e);
-//                 break; // Break out of the loop on error
-//             }
-//         }
-//     }
-// }
-//
-// fn main() {
-//     // List available ports
-//     list_available_ports();
-//
-//     // Configure and open serial port
-//     let mut port = configure_and_open_serial_port("/dev/ttyUSB0", 9600);
-//
-//     // Receive data from the serial port
-//     receive_data(&mut port, "resources/received.txt");
-// }
-//
-//
+/*
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-use serialport;
-use serialport::{DataBits, FlowControl, Parity, SerialPort, StopBits};
-use std::fs::File;
-use std::io::{Read, Write};
+use std::thread;
+use std::io::Write;
 use std::time::Duration;
 
+use serialport::Parity;
+
 fn main() {
-
     let ports = serialport::available_ports().expect("No ports found!");
-
     for p in ports {
         println!("{}", p.port_name);
     }
 
-    let mut port = serialport::new("/dev/ttyUSB0", 9600)
-        .data_bits(DataBits::Eight)
-        .stop_bits(StopBits::One)
+    //let mut port = serialport::new("/dev/ttyS0", 9600)
+    //    .timeout(Duration::from_millis(10000))
+    //    .open()
+    //    .expect("Failed to open port");
+
+    let mut port = serialport::new("/dev/ttyS0",16550)
+        .stop_bits(serialport::StopBits::One)
+        .data_bits(serialport::DataBits::Eight)
+        .parity(Parity::None)
+        .timeout(Duration::from_millis(1000))
+        .open()
+        .unwrap_or_else(|e| {
+            eprintln!("Failed to open {}", e);
+            ::std::process::exit(1);
+        });
+
+    let output = "Hello".as_bytes();
+    port.write_all(output).expect("Write failed!");
+
+    //let mut write_buffer:Vec<u8> = vec![0;10];
+    //write_buffer[0]= b'H';
+    // write_buffer[1]= b'e';
+    // port.write_all(&write_buffer[..2]).expect("write failed");
+
+    println!("data send -> {:?}", output);
+
+
+
+    thread::sleep(Duration::from_millis(10000));
+
+
+    drop(port);
+}
+
+*/
+
+use serialport::SerialPort;
+use serialport::{DataBits, FlowControl, Parity, StopBits};
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::Path;
+use std::time::Duration;
+
+fn main() {
+    let mut file = File::open("resources/857.txt").expect("unable to open file");
+    let mut file_buffer: Vec<u8> = Vec::new();
+    file.read_to_end(&mut file_buffer).expect("unable to write");
+    let mut extra_buffer = file_buffer.clone();
+
+    let size_of_buffer = file_buffer.len();
+
+    let ports = serialport::available_ports().expect("No ports found!");
+    for p in ports {
+        println!("{}", p.port_name);
+    }
+
+    let mut port = serialport::new("/dev/ttyS0", 9600)
+        .data_bits(serialport::DataBits::Eight)
+        .stop_bits(serialport::StopBits::One)
         .parity(Parity::None)
         .flow_control(FlowControl::None)
         .timeout(Duration::from_millis(10))
         .open()
-        .expect("Failed to open port");
+        .unwrap_or_else(|e| {
+            eprintln!("Failed to open {}", e);
+            ::std::process::exit(1);
+        });
+
+    println!("size of buffer{}", size_of_buffer);
+
+    for mut data in extra_buffer.chunks(size_of_buffer / 8) {
+        port.clear(serialport::ClearBuffer::All)
+            .expect("unable to clear buffer");
+        let mut _output = "HELLO".as_bytes();
+        port.write(&mut data).expect("write failed");
+        port.flush().expect("unable to clear buffer");
+        std::thread::sleep(Duration::from_millis(500));
+
+        println!("write data -> {:?}", data);
+
+        if data == &[10] {
+                    std::thread::sleep(Duration::from_millis(500));
+
+            println!("data{:?}", data);
+            receive_acknowledgement(port.try_clone().expect("unable to clone "));
+            break;
+        }
+    }
+
+   
+}
+
+//function to read acknowledgement
+
+fn receive_acknowledgement(mut port: Box<dyn SerialPort>) {
 
 
-    // Receiver code snippet
-    let mut buffer: Vec<u8> = vec![0;2028];
+    let mut buffer: Vec<u8> = vec![0;1024];
+    let mut output_file = File::create("resources/acknowledgement.txt")
+        .expect("unable to create acknowledgement file");
+     println!("inside acknowledgement function2");
+    
+    port.clear(serialport::ClearBuffer::Input).expect("unable to clear buffer");
 
-    let mut output_file =
-        File::create("resources/received.txt").expect("unable to create a file");
-
-    port.clear(serialport::ClearBuffer::All).expect("unable to clear buffer");
-    // Read in a loop1..
-
-    loop{
+    loop {
         match port.read(&mut buffer) {
             Ok(bytes_read) => {
                 if bytes_read > 0 {
                     let received_data = &buffer[..bytes_read];
-                    if std::str::from_utf8(received_data).is_ok() {
+                      if std::str::from_utf8(received_data).is_ok() {
                         let utf_8_data = String::from_utf8_lossy(received_data);
+
                         output_file
                             .write_all(&received_data)
-                            .expect("unable to write data");
-                        println!("Received: {:?}", utf_8_data);
+                            .expect("unable to write data in file");
 
-                        if utf_8_data=="\n" {
-                            drop(output_file);
-                            std::thread::sleep(Duration::from_millis(50)); // Adjust sleep duration as needed
+                        println!("acknowledgement -> {:?}", utf_8_data);
 
-                            send_acknowledgement(port.try_clone().expect("unable to clone "));
-                             break;
-                        }
+                      //  if received_data == &[10] {
+                        //    break;
+                       // }
+                        port.clear(serialport::ClearBuffer::Input)
+                            .expect(" unable to clear buffer");
 
-                        port.clear(serialport::ClearBuffer::Input).expect("unable to clear buffer");
-
-                        std::thread::sleep(Duration::from_millis(50)); // Adjust sleep duration as needed
+                        std::thread::sleep(Duration::from_millis(50));
                     } else {
-                        println!("Received non-UTF-8 data{:?}",&received_data);
+                        println!("Received non-utf data {:?}", &received_data);
                     }
-
                 }
             }
 
             Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {
-                eprintln!("Timeout occurred. Waiting for more data...");
+                eprintln!("time out occured . Waiting for more data ....");
             }
             Err(e) => {
-                eprintln!("Error reading from serial port: {}", e);
-                 break; // Break out of the loop on error
+                eprintln!("Error reading from serial port : {}", e);
+                break;
             }
         }
     }
-
 }
-
-
-fn send_acknowledgement(mut port: Box<dyn SerialPort>){
-    let mut file = File::open("resources/857.txt").expect("unable to open 894 acknowledgement file");
-    let mut file_buffer  :Vec<u8> = Vec::new();
-    file.read_to_end(&mut file_buffer ).expect("unable to write ");
-
-    let extra_buffer =file_buffer.clone();
-    let size_of_buffer= extra_buffer.len();
-
-    for mut data in extra_buffer.chunks(size_of_buffer/8) {
-        port.clear(serialport::ClearBuffer::All).expect("unable to clear buffer");
-        port.write(&mut data).expect("write failed");
-        port.flush().expect("unable to flush");
-        std::thread::sleep(Duration::from_millis(500));
-        println!("acknowledment send ->{:?}",data);
-    }
-
-}
-
-
-
-
